@@ -3,7 +3,7 @@
 #include<stdlib.h>
 #include<math.h>
 
-static const double eps = 1.0e-8;
+static const double eps = 1e-4;
 
 typedef struct tableau {
 	int m, n;
@@ -83,10 +83,10 @@ void mostra_tableau(Tableau *tab) {
 	}
 }
 
-int coluna_pico(Tableau *tab) {
+int coluna_pivo(Tableau *tab) {
 	int i;
 	for (i = 1; i < tab->n; ++i)
-		if (tab->A[0][i] < 0)
+		if (tab->A[0][i] + eps < 0)
 			return i;
 
 	return -1;
@@ -99,7 +99,7 @@ int linha_pivo(Tableau *tab, int col_pivo) {
 	double min = INFINITY;
 
 	for (i = 1; i < tab->m; ++i) {
-		if (tab->A[i][col_pivo] > 0) {
+		if (tab->A[i][col_pivo] - eps > 0) {
 			razao = tab->A[i][0] / tab->A[i][col_pivo];
 			printf("\nRazão: %lf", razao);
 			if (min >= razao) { //Em caso de empate, permanece o de menor índice
@@ -131,7 +131,6 @@ void pivoteamento(Tableau *tab, int lin_pivo, int col_pivo) {
 	for (i = 0; i < tab->m; ++i) {
 		float tmp = tab->A[i][col_pivo];
 		if (i != lin_pivo) {
-
 			for (j = 0; j < tab->n; ++j) {
 				tab->A[i][j] += tab->A[lin_pivo][j] * -tmp;
 			}
@@ -142,12 +141,13 @@ void pivoteamento(Tableau *tab, int lin_pivo, int col_pivo) {
 void vetor_otimo(Tableau *tab, double x[]) {
 	int i, j, k = 1;
 	for (j = 1; j < tab->n; ++j) {
-		if (igual(tab->A[0][j], 0)) {
+		if (!igual(tab->A[0][j], 0)) {
+			x[k++] = 0;
+		} else {
 			for (i = 1; i < tab->m; ++i)
 				if (igual(tab->A[i][j], 1))
 					x[k++] = tab->A[i][0];
-		}else
-			x[k++] = 0;
+		}
 	}
 }
 
@@ -209,10 +209,10 @@ int simplex(int m, int n, double z[], double A[][MAX], double b[], double *z0,
 		mostra_tableau(aux);
 
 		//simplex
-		for (j = 1; j < aux->n; ++j) {
+		while (coluna_pivo(aux) != -1) {
 			//Acha a coluna pivô
-			if (aux->A[0][j] < 0) {
-				col_pivo = j;
+			col_pivo = coluna_pivo(aux);
+			if (col_pivo > 0) {
 				lin_pivo = linha_pivo(aux, col_pivo); //Acha a linha pivô
 				if (lin_pivo >= 0)
 					pivoteamento(aux, lin_pivo, col_pivo); //Computa o novo tableau
@@ -221,48 +221,46 @@ int simplex(int m, int n, double z[], double A[][MAX], double b[], double *z0,
 			}
 		}
 
-		if (j == aux->n) { //Todos os valores na linha 0 são não-negativos
-			if (igual(aux->A[0][0], 0)) {
-				for (j = 1; j < aux->n; ++j) {
-					aux->A[0][j] = -z[j];
+		//Todos os valores na linha 0 são não-negativos
+		if (igual(aux->A[0][0], 0)) {
+//			for (j = 1; j < aux->n; ++j) {
+//				aux->A[0][j] = -z[j];
+//			}
+			for (i = 1; i < tab->m; ++i) {
+				for (j = 0; j < tab->n; ++j) {
+					tab->A[i][j] = aux->A[i][j];
 				}
-				for (i = 0; i < tab->m; ++i) {
-					for (j = 0; j < tab->n; ++j) {
-						tab->A[i][j] = aux->A[i][j];
-					}
-				}
-				mostra_tableau(tab);
-			} else if (aux->A[0][0] > 0) {
-				return UNBD;
-			} else {
-				return NFEA;
 			}
+			mostra_tableau(tab);
+		} else if (aux->A[0][0] > 0) {
+			return UNBD;
+		} else {
+			return NFEA;
 		}
 
 	}	// Deu boa, podemos fazer o pivoteamento
 	printf("\nA base é viável, mãos a obra!\n");
-
-	while (1) {
+	while (coluna_pivo(tab) != -1) {
 		//Acha a coluna pivô
-		col_pivo = coluna_pico(tab);
+		col_pivo = coluna_pivo(tab);
 		if (col_pivo > 0) {
 			lin_pivo = linha_pivo(tab, col_pivo); //Acha a linha pivô
 			if (lin_pivo >= 0)
 				pivoteamento(tab, lin_pivo, col_pivo); //Computa o novo tableau
 			else
 				return UNBD;
-		} else { //Todos os valores na linha 0 são não-negativos
-			int cont = 0;
-			if (m > n) {
-				for (i = 1; i < tab->m; ++i)
-					if (!igual(tab->A[i][0], 0))
-						cont++;
-				if (cont > n)
-					return NFEA;
-			}
-			*z0 = tab->A[0][0];
-			vetor_otimo(tab, x);
-			return FEA;
 		}
 	}
+	//Todos os valores na linha 0 são não-negativos
+	if (m > n) {
+		int cont = 0;
+		for (i = 1; i < tab->m; ++i)
+			if (!igual(tab->A[i][0], 0))
+				cont++;
+		if (cont > n)
+			return NFEA;
+	}
+	*z0 = tab->A[0][0];
+	vetor_otimo(tab, x);
+	return FEA;
 }
