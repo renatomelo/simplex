@@ -42,7 +42,7 @@ Tableau *cria_tableau(int m, int n, double z[], double A[][MAX], double b[]) {
 
 	return tab;
 }
-
+/*
 void mostra_tableau(Tableau *tab) {
 	int i, j;
 	printf("\n");
@@ -52,7 +52,7 @@ void mostra_tableau(Tableau *tab) {
 		}
 		printf("\n");
 	}
-}
+}*/
 //Adiciona variaveis de folga em cada restrição
 void add_folgas(Tableau *tab) {
 	int i, j, n = tab->n;
@@ -85,7 +85,7 @@ int linha_pivo(Tableau *tab, int col_pivo) {
 	for (i = 1; i < tab->m; ++i) {
 		if (tab->A[i][col_pivo] - eps > 0) {
 			razao = tab->A[i][0] / tab->A[i][col_pivo];
-			if (min >= razao) {
+			if (min > razao) {
 				min = razao;
 				lin_pivo = i;
 			}
@@ -97,7 +97,6 @@ int linha_pivo(Tableau *tab, int col_pivo) {
 	return lin_pivo;
 }
 
-//Usa regra de Bland para escolher a variavel que entra e a que sai
 void pivoteamento(Tableau *tab, int lin_pivo, int col_pivo) {
 	int i, j;
 	double pivo;
@@ -109,10 +108,10 @@ void pivoteamento(Tableau *tab, int lin_pivo, int col_pivo) {
 	}
 	// Calcula as novas linhas
 	for (i = 0; i < tab->m; ++i) {
-		float tmp = tab->A[i][col_pivo];
+		double tmp = tab->A[i][col_pivo];
 		if (i != lin_pivo) {
 			for (j = 0; j < tab->n; ++j) {
-				tab->A[i][j] += tab->A[lin_pivo][j] * -tmp;
+				tab->A[i][j] -= tab->A[lin_pivo][j] * tmp;
 			}
 		}
 	}
@@ -136,14 +135,14 @@ Tableau *auxiliar(Tableau *tab) {
 	aux->m = tab->m;
 	aux->n = tab->n;
 
-	for (i = 0; i < tab->m; ++i)
-		for (j = 0; j < tab->n; ++j)
-			aux->A[i][j] = tab->A[i][j];
-
-	for (i = 1; i < aux->m; ++i)
-		if (aux->A[i][0] + eps < 0)
-			for (j = 0; j < aux->n; ++j)
-				aux->A[i][j] = -aux->A[i][j];
+	for (i = 0; i < tab->m; ++i){
+		for (j = 0; j < tab->n; ++j){
+			if (tab->A[i][0] + eps < 0)
+				aux->A[i][j] = -tab->A[i][j];
+			else
+				aux->A[i][j] = tab->A[i][j];
+		}
+	}
 
 	for (j = 0; j < tab->n; ++j) {
 		double soma = 0;
