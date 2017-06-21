@@ -1,10 +1,9 @@
+#include<bits/stdc++.h>
 #include"simplex.h"
-#include<stdio.h>
-#include<stdlib.h>
-#include<math.h>
 
-static const double eps = 1e-4;
+static const double eps = 1e-9;
 
+//Estrutura que representa o tableau do simplex
 typedef struct tableau {
 	int m, n;
 	double A[MAX][MAX];
@@ -14,14 +13,11 @@ int igual(double x, double y) {
 	return fabs(x - y) < eps;
 }
 
-int b_positivo (double b[], int m) {
-	int i, j;
-
-	for (i = 1; i <= m; ++i) {
+int b_naonegativo(double b[], int m) {
+	int i;
+	for (i = 1; i <= m; ++i)
 		if (b[i] < 0)
 			return 0;
-	}
-
 	return 1;
 }
 
@@ -42,18 +38,18 @@ Tableau *cria_tableau(int m, int n, double z[], double A[][MAX], double b[]) {
 
 	return tab;
 }
-/*
+
 void mostra_tableau(Tableau *tab) {
 	int i, j;
 	printf("\n");
 	for (i = 0; i < tab->m; ++i) {
 		for (j = 0; j < tab->n; ++j) {
-			printf("%.1lf\t", tab->A[i][j]);
+			printf("%.2lf\t", tab->A[i][j]);
 		}
 		printf("\n");
 	}
-}*/
-//Adiciona variaveis de folga em cada restrição
+}
+//Adiciona variaveis de folga em cada restrição adicionando m colunas à matriz
 void add_folgas(Tableau *tab) {
 	int i, j, n = tab->n;
 	tab->n += tab->m - 1;
@@ -67,16 +63,16 @@ void add_folgas(Tableau *tab) {
 	}
 }
 
+// Encontra a coluna pivô (variável que entra na base)
 int coluna_pivo(Tableau *tab) {
 	int i;
 	for (i = 1; i < tab->n; ++i)
 		if (tab->A[0][i] + eps < 0)
 			return i;
-
 	return -1;
 }
 
-//Encontra a linha pivô
+//Encontra a linha pivô (variável que sai da base)
 int linha_pivo(Tableau *tab, int col_pivo) {
 	double razao;
 	int i, lin_pivo;
@@ -92,12 +88,14 @@ int linha_pivo(Tableau *tab, int col_pivo) {
 		}
 	}
 	//Se não tem elemento positivo na coluna pivô
-	if (min == INFINITY) return -1;
+	if (min == INFINITY)
+		return -1;
 
 	return lin_pivo;
 }
 
-void pivoteamento(Tableau *tab, int lin_pivo, int col_pivo) {
+//Computa o novo tableau dado o pivô A[lin_pivo][lin_pivo]
+void novo_tableau(Tableau *tab, int lin_pivo, int col_pivo) {
 	int i, j;
 	double pivo;
 	pivo = tab->A[lin_pivo][col_pivo];
@@ -116,6 +114,26 @@ void pivoteamento(Tableau *tab, int lin_pivo, int col_pivo) {
 		}
 	}
 }
+
+/*Usa a regra de Bland para definir as variáveis que entram e que saem da base.
+ Devolve FEA se programa é viáve e UNBD se for ilimitado*/
+int pivoteamento(Tableau *tab) {
+	int col_pivo, lin_pivo;
+	//Dado que com a regra de bland o simplex não cicla, o laço pára
+	while (1) {
+		col_pivo = coluna_pivo(tab); //Acha a coluna pivô
+		if (col_pivo == -1)
+			break;
+		lin_pivo = linha_pivo(tab, col_pivo); //Acha a linha pivô
+		if (lin_pivo > -1)
+			novo_tableau(tab, lin_pivo, col_pivo); //Computa o novo tableau
+		else
+			return UNBD;
+	}
+	return FEA;
+}
+
+//Salva os valores encontrados para o vetor x[]
 void vetor_otimo(Tableau *tab, double x[]) {
 	int i, j, k = 1;
 	for (j = 1; j < tab->n; ++j) {
@@ -128,15 +146,17 @@ void vetor_otimo(Tableau *tab, double x[]) {
 		}
 	}
 }
-
+/* Devolve o tableau de um programa auxiliar. Caso existam valores negativos em b[],
+ São invertidos os sinais dos elementos da restrição i cujo b_i seja negativo */
 Tableau *auxiliar(Tableau *tab) {
 	int i, j;
 	Tableau *aux = (Tableau*) malloc(sizeof(Tableau));
 	aux->m = tab->m;
 	aux->n = tab->n;
 
-	for (i = 0; i < tab->m; ++i){
-		for (j = 0; j < tab->n; ++j){
+	for (i = 0; i < tab->m; ++i) {
+		for (j = 0; j < tab->n; ++j) {
+			//Inverte os sinais dos elementos da restrição i cujo b_i seja negativo
 			if (tab->A[i][0] + eps < 0)
 				aux->A[i][j] = -tab->A[i][j];
 			else
@@ -146,15 +166,15 @@ Tableau *auxiliar(Tableau *tab) {
 
 	for (j = 0; j < tab->n; ++j) {
 		double soma = 0;
-		for (i = 1; i < aux->m; ++i) {
+		for (i = 1; i < aux->m; ++i)
 			soma -= aux->A[i][j];
-		}
 		aux->A[0][j] = soma;
 	}
-
 	return aux;
 }
 
+/*Verifica se o programa possui base viável, devolve 1 se a submatriz das ultimas m
+ colunas de A é uma matriz identidade e zero caso contrario*/
 int tem_matriz_identidade(Tableau *tab) {
 	int i, j;
 	for (i = 1; i < tab->m; i++) {
@@ -168,74 +188,85 @@ int tem_matriz_identidade(Tableau *tab) {
 	return 1;
 }
 
+/* Se algum elemento de b[] for zero, procura por alguma variavel não nula do programa
+ *  original, senão encontra, mantém a variavel auxiliar igual a zero.*/
+void var_artificial_na_base(Tableau *aux) {
+	int i, j;
+	for (i = 1; i < aux->m; ++i) {
+		if (igual(aux->A[i][0], 0)) {
+			for (j = 1; j < aux->n - aux->m + 1; ++j)
+				if (!igual(aux->A[i][j], 0))
+					novo_tableau(aux, i, j);
+		}
+	}
+}
+
 int simplex(int m, int n, double z[], double A[][MAX], double b[], double *z0,
 		double x[]) {
 	int i, j, lin_pivo, col_pivo;
 
-	//Controi o tableau
+	//Constroi o tableau
 	Tableau *tab = cria_tableau(m, n, z, A, b);
 
+	//Se a base não é viável, cria variaveis artificiais e um programa auxiliar
 	if (!tem_matriz_identidade(tab)) {
 		// PROGRAMA AUXILIAR
 		Tableau *aux = auxiliar(tab);
 		add_folgas(aux);
 
-		while (coluna_pivo(aux) > -1) {
-			col_pivo = coluna_pivo(aux);
-			lin_pivo = linha_pivo(aux, col_pivo);
-			if (lin_pivo >= 0)
-				pivoteamento(aux, lin_pivo, col_pivo); //Computa o novo tableau
-			else
-				return UNBD;
-		}
+		//Faz pivoteamento enquanto existir variavel não negativa na função objetivo
+		if (pivoteamento(aux))
+			return UNBD;
 
-		//Todos os valores na linha 0 são não-negativos
+		//Otimo do programa auxiliar encontrado
 		if (igual(aux->A[0][0], 0)) {
+			//se tem variavel artificial na base faz pivoteamento quando necessario
+			var_artificial_na_base(aux);
 			for (i = 1; i < tab->m; ++i)
 				for (j = 0; j < tab->n; ++j)
 					tab->A[i][j] = aux->A[i][j];
+			free(aux);
 		} else if (aux->A[0][0] - eps > 0) {
+			free(aux);
+			free(tab);
 			return UNBD;
 		} else {
+			free(aux);
+			free(tab);
 			return NFEA;
 		}
 	}
 
 	// A base é viável?
-	if (!b_positivo(b, m)) { // Não! vamos criar um programa auxiliar e resolvê-lo
+	if (!b_naonegativo(b, m)) { // Não! cria um programa auxiliar e resolve-o
 		Tableau *aux = auxiliar(tab);
 
-		while (coluna_pivo(aux) > -1) {
-			col_pivo = coluna_pivo(aux);
-			lin_pivo = linha_pivo(aux, col_pivo);
-			if (lin_pivo >= 0)
-				pivoteamento(aux, lin_pivo, col_pivo); //Computa o novo tableau
-			else
-				return UNBD;
-		}
+		if (pivoteamento(aux))
+			return UNBD;
 
-		//Todos os valores na linha 0 são não-negativos
 		if (igual(aux->A[0][0], 0)) {
 			for (i = 1; i < tab->m; ++i)
 				for (j = 0; j < tab->n; ++j)
 					tab->A[i][j] = aux->A[i][j];
+
 		} else if (aux->A[0][0] - eps > 0) {
+			free(aux);
+			free(tab);
 			return UNBD;
 		} else {
+			free(aux);
+			free(tab);
 			return NFEA;
 		}
 	}
 
-	while (coluna_pivo(tab) > -1) {
-		col_pivo = coluna_pivo(tab); //Acha a coluna pivô
-		lin_pivo = linha_pivo(tab, col_pivo); //Acha a linha pivô
-		if (lin_pivo > -1)
-			pivoteamento(tab, lin_pivo, col_pivo); //Computa o novo tableau
-		else
-			return UNBD;
+	if (pivoteamento(tab)) {
+		free(tab);
+		return UNBD;
+	} else {
+		*z0 = tab->A[0][0];
+		vetor_otimo(tab, x);
+		free(tab);
+		return FEA;
 	}
-
-	*z0 = tab->A[0][0];
-	vetor_otimo(tab, x);
-	return FEA;
 }
