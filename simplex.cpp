@@ -3,7 +3,6 @@
 
 static const double eps = 1e-9;
 
-//Estrutura que representa o tableau do simplex
 typedef struct tableau {
 	int m, n;
 	double A[MAX][MAX];
@@ -39,17 +38,7 @@ Tableau *cria_tableau(int m, int n, double z[], double A[][MAX], double b[]) {
 	return tab;
 }
 
-void mostra_tableau(Tableau *tab) {
-	int i, j;
-	printf("\n");
-	for (i = 0; i < tab->m; ++i) {
-		for (j = 0; j < tab->n; ++j) {
-			printf("%.2lf\t", tab->A[i][j]);
-		}
-		printf("\n");
-	}
-}
-//Adiciona variaveis de folga em cada restrição adicionando m colunas à matriz
+//Adiciona variaveis de folga em cada restrição
 void add_folgas(Tableau *tab) {
 	int i, j, n = tab->n;
 	tab->n += tab->m - 1;
@@ -116,7 +105,7 @@ void novo_tableau(Tableau *tab, int lin_pivo, int col_pivo) {
 }
 
 /*Usa a regra de Bland para definir as variáveis que entram e que saem da base.
- Devolve FEA se programa é viáve e UNBD se for ilimitado*/
+ Devolve FEA se programa é viável e UNBD se for ilimitado*/
 int pivoteamento(Tableau *tab) {
 	int col_pivo, lin_pivo;
 	//Dado que com a regra de bland o simplex não cicla, o laço pára
@@ -147,7 +136,7 @@ void vetor_otimo(Tableau *tab, double x[]) {
 	}
 }
 /* Devolve o tableau de um programa auxiliar. Caso existam valores negativos em b[],
- São invertidos os sinais dos elementos da restrição i cujo b_i seja negativo */
+ são invertidos os sinais dos elementos da restrição i cujo b_i < 0 */
 Tableau *auxiliar(Tableau *tab) {
 	int i, j;
 	Tableau *aux = (Tableau*) malloc(sizeof(Tableau));
@@ -188,8 +177,8 @@ int tem_matriz_identidade(Tableau *tab) {
 	return 1;
 }
 
-/* Se algum elemento de b[] for zero, procura por alguma variavel não nula do programa
- *  original, senão encontra, mantém a variavel auxiliar igual a zero.*/
+/* Verifica se existe variavel artificial na base. Se algum elemento de b[] for zero, procura por alguma variavel não nula do programa original, senão encontra,
+mantém a variavel auxiliar igual a zero.*/
 void var_artificial_na_base(Tableau *aux) {
 	int i, j;
 	for (i = 1; i < aux->m; ++i) {
@@ -248,7 +237,7 @@ int simplex(int m, int n, double z[], double A[][MAX], double b[], double *z0,
 			for (i = 1; i < tab->m; ++i)
 				for (j = 0; j < tab->n; ++j)
 					tab->A[i][j] = aux->A[i][j];
-
+			free(aux);
 		} else if (aux->A[0][0] - eps > 0) {
 			free(aux);
 			free(tab);
@@ -263,7 +252,7 @@ int simplex(int m, int n, double z[], double A[][MAX], double b[], double *z0,
 	if (pivoteamento(tab)) {
 		free(tab);
 		return UNBD;
-	} else {
+	} else { // otimo encontrado
 		*z0 = tab->A[0][0];
 		vetor_otimo(tab, x);
 		free(tab);
